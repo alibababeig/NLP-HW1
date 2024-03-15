@@ -52,9 +52,13 @@ class KhabarFooriCrawler:
 
     @staticmethod
     def _scrape_news_urls(list_url):
+        urls = []
         try:
+            # Request the html page conatining news list
             res = requests.get(list_url)
             soup = BeautifulSoup(res.content, "html.parser")
+
+            # Find the actual news list in the page
             ul = soup\
                 .find(name='body')\
                 .find(name='main')\
@@ -65,15 +69,21 @@ class KhabarFooriCrawler:
                 .find(name='div', class_='container front_b mt20')\
                 .find(name='ul', class_='box container')
 
+            # Extract (relative) url for each of the news in the list
             relative_urls = [li.find(name='a', class_='res').get('href')
                              for li in ul.find_all('li')]
 
+            # Convert relative urls to absolute urls
             urls = [urljoin('https://www.khabarfoori.com/', rel_url)
                     for rel_url in relative_urls]
-            return urls
 
         except Exception as e:
-            print(f'ERROR encountered in worker thread: `{str(e)}`')
+            print(f'ERROR! `{type(e).__name__}` in '
+                  f'{KhabarFooriCrawler._scrape_news_urls.__name__}: '
+                  f'`{str(e)}`')
+
+        finally:
+            return urls
 
     @staticmethod
     def _scrape_news_data(news_url):
