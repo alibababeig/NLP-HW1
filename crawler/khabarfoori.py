@@ -1,6 +1,10 @@
 import re
 from concurrent.futures import ThreadPoolExecutor
 
+from bs4 import BeautifulSoup
+import requests
+from urllib.parse import urljoin
+
 
 class KhabarFooriUrlHandler:
     def __init__(self):
@@ -48,7 +52,28 @@ class KhabarFooriCrawler:
 
     @staticmethod
     def _scrape_news_urls(list_url):
-        pass
+        try:
+            res = requests.get(list_url)
+            soup = BeautifulSoup(res.content, "html.parser")
+            ul = soup\
+                .find(name='body')\
+                .find(name='main')\
+                .find(name='div', class_='main_wrapper pad8')\
+                .find(name='div', class_='row_landing_inner container')\
+                .find(name='div', class_='right_side container')\
+                .find(name='div', class_='column_1')\
+                .find(name='div', class_='container front_b mt20')\
+                .find(name='ul', class_='box container')
+
+            relative_urls = [li.find(name='a', class_='res').get('href')
+                             for li in ul.find_all('li')]
+
+            urls = [urljoin('https://www.khabarfoori.com/', rel_url)
+                    for rel_url in relative_urls]
+            return urls
+
+        except Exception as e:
+            print(f'ERROR encountered in worker thread: `{str(e)}`')
 
     @staticmethod
     def _scrape_news_data(news_url):
@@ -56,7 +81,16 @@ class KhabarFooriCrawler:
 
 
 def main():
-    pass
+    url_handler = iter(KhabarFooriUrlHandler())
+
+    for _ in range(1):
+        next(url_handler)
+    list_url = next(url_handler)
+    print(list_url)
+
+    news_urls = KhabarFooriCrawler._scrape_news_urls(list_url)
+    print(len(news_urls))
+    print(news_urls)
 
 
 if __name__ == '__main__':
