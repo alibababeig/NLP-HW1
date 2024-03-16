@@ -1,3 +1,4 @@
+import json
 import re
 from concurrent.futures import ThreadPoolExecutor
 
@@ -31,24 +32,38 @@ class KhabarFooriCrawler:
         self._pool = ThreadPoolExecutor(n_workers)
 
     def get_latest_news(self, n_news):
-        all_news_data = []
-        news_urls = []
-        while len(all_news_data) < n_news:
-            # Scrape news urls from a news list and add them to `news_urls`
-            while len(news_urls) < self._n_workers:
-                news_list_url = next(self._urls)
-                news_urls += self._scrape_news_urls(news_list_url)
+        all_news_data = {}
+        try:
+            news_urls = []
+            while len(all_news_data) < n_news:
+                cur_needed_news = min(
+                    self._n_workers, n_news - len(all_news_data))
+                # Scrape news urls from a news list and add them to `news_urls`
+                while len(news_urls) < cur_needed_news:
+                    news_list_url = next(self._urls)
+                    news_urls += self._scrape_news_urls(news_list_url)
 
-            # Spawn workers to scrape news data
-            results = self._pool.map(KhabarFooriCrawler._scrape_news_data,
-                                     news_urls[:self._n_workers])
+                # Spawn workers to scrape news data
+                results = self._pool.map(KhabarFooriCrawler._scrape_news_data,
+                                         news_urls[:cur_needed_news])
 
-            # Remove used urls from `news_urls`
-            news_urls = news_urls[self._n_workers:]
+                # Remove used urls from `news_urls`
+                news_urls = news_urls[cur_needed_news:]
 
-            # Wait for all workers to finish, by converting generator to list
-            results = list(results)
-            all_news_data += results
+                # Wait for all workers to finish, by converting generator to list
+                results = list(results)
+                for res in results:
+                    if res is not None:
+                        news_id, news_data = res
+                        all_news_data[news_id] = news_data
+
+                print(f'Number of scraped news = {len(all_news_data)}')
+
+        except KeyboardInterrupt:
+            print('User interrupt received. Terminating the process...')
+
+        finally:
+            return all_news_data
 
     @staticmethod
     def _scrape_news_urls(list_url):
@@ -77,6 +92,8 @@ class KhabarFooriCrawler:
             urls = [urljoin('https://www.khabarfoori.com/', rel_url)
                     for rel_url in relative_urls]
 
+            print(f'Successfully got news urls from `{list_url}`')
+
         except Exception as e:
             print(f'ERROR! `{type(e).__name__}` in '
                   f'{KhabarFooriCrawler._scrape_news_urls.__name__}: '
@@ -87,20 +104,79 @@ class KhabarFooriCrawler:
 
     @staticmethod
     def _scrape_news_data(news_url):
-        pass
+        try:
+            # Request the html page conatining news data
+            res = requests.get(news_url)
+            soup = BeautifulSoup(res.content, "html.parser")
+
+            # Extract important parts of the news from the page
+            article = soup\
+                .find(name='body')\
+                .find(name='main')\
+                .find(name='div', class_='main_wrapper pad8')\
+                .find(name='div', class_='row_landing_inner container')\
+                .find(name='div', class_='right_side container')\
+                .find(name='div', class_='column_1')\
+                .find(name='article', class_='news_page_article container')
+
+            header = article\
+                .find(name='header', class_='article_header mt20 box container')
+
+            news_category = header\
+                .find(name='div', class_='breadcrumb_cnt')\
+                .find(name='ul', class_='bread_crump')\
+                .find_all(name='li')[-1]\
+                .find(name='span', class_='')\
+                .text.strip()
+
+            news_datetime = header\
+                .find(name='div', class_='breadcrumb_cnt')\
+                .find(name='time').get('datetime')
+
+            news_title = header\
+                .find(name='h1', class_='title')\
+                .text.strip()
+
+            news_lead = header\
+                .find(name='p', class_='lead')\
+                .text.strip()
+
+            news_id = article\
+                .find(name='div', class_='article_content mt20 box container')\
+                .find(name='div', class_='print_cnt')\
+                .find(name='div', class_='noprint print_icon')\
+                .find(name='span', class_='news_id')\
+                .find_all(text=True, recursive=False)
+            news_id = int(''.join(news_id).strip())
+
+            news_text = article\
+                .find(name='div', class_='article_content mt20 box container')\
+                .find(name='div', id='main_ck_editor')\
+                .text.strip()
+
+            # print(f'Successfully scraped news data from `{news_url}`')
+
+            return news_id, {
+                'url': news_url,
+                'category': news_category,
+                'datetime': news_datetime,
+                'title': news_title,
+                'lead': news_lead,
+                'text': news_text,
+            }
+
+        except Exception as e:
+            print(f'ERROR! `{type(e).__name__}` in '
+                  f'{KhabarFooriCrawler._scrape_news_data.__name__}: '
+                  f'`{str(e)}`')
+            return None, None
 
 
 def main():
-    url_handler = iter(KhabarFooriUrlHandler())
-
-    for _ in range(1):
-        next(url_handler)
-    list_url = next(url_handler)
-    print(list_url)
-
-    news_urls = KhabarFooriCrawler._scrape_news_urls(list_url)
-    print(len(news_urls))
-    print(news_urls)
+    crawler = KhabarFooriCrawler(n_workers=75)
+    news = crawler.get_latest_news(n_news=750)
+    with open('./news.json', 'w') as f:
+        json.dump(news, f, indent=4, ensure_ascii=False)
 
 
 if __name__ == '__main__':
