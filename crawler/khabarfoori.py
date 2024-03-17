@@ -146,7 +146,7 @@ class KhabarFooriCrawler:
                 .find(name='div', class_='print_cnt')\
                 .find(name='div', class_='noprint print_icon')\
                 .find(name='span', class_='news_id')\
-                .find_all(text=True, recursive=False)
+                .find_all(string=True, recursive=False)
             news_id = int(''.join(news_id).strip())
 
             news_text = article\
