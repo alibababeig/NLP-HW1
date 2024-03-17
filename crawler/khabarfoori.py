@@ -122,12 +122,12 @@ class KhabarFooriCrawler:
             header = article\
                 .find(name='header', class_='article_header mt20 box container')
 
-            news_category = header\
+            news_categories = header\
                 .find(name='div', class_='breadcrumb_cnt')\
                 .find(name='ul', class_='bread_crump')\
-                .find_all(name='li')[-1]\
-                .find(name='span', class_='')\
-                .text.strip()
+                .find_all(name='li')[1:]
+            news_categories = [li.find(name='span', class_='').text.strip()
+                               for li in news_categories]
 
             news_datetime = header\
                 .find(name='div', class_='breadcrumb_cnt')\
@@ -164,7 +164,7 @@ class KhabarFooriCrawler:
 
             return news_id, {
                 'url': news_url,
-                'category': news_category,
+                'category': news_categories,
                 'datetime': news_datetime,
                 'title': news_title,
                 'lead': news_lead,
