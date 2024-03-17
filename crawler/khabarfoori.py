@@ -154,6 +154,12 @@ class KhabarFooriCrawler:
                 .find(name='div', id='main_ck_editor')\
                 .text.strip()
 
+            news_tags = article\
+                .find(name='div', class_='article_content mt20 box container')\
+                .find(name='div', class_='news_tags noprint container')\
+                .find_all(name='a')
+            news_tags = [a.text.strip() for a in news_tags]
+
             # print(f'Successfully scraped news data from `{news_url}`')
 
             return news_id, {
@@ -163,6 +169,7 @@ class KhabarFooriCrawler:
                 'title': news_title,
                 'lead': news_lead,
                 'text': news_text,
+                'tags': news_tags
             }
 
         except Exception as e:
