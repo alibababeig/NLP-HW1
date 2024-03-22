@@ -163,13 +163,13 @@ class KhabarFooriCrawler:
             # print(f'Successfully scraped news data from `{news_url}`')
 
             return news_id, {
-                'url': news_url,
-                'category': news_categories,
-                'datetime': news_datetime,
                 'title': news_title,
                 'lead': news_lead,
                 'text': news_text,
-                'tags': news_tags
+                'tags': news_tags,
+                'category': news_categories,
+                'datetime': news_datetime,
+                'url': news_url,
             }
 
         except Exception as e:
@@ -180,7 +180,7 @@ class KhabarFooriCrawler:
 
 
 def main():
-    crawler = KhabarFooriCrawler(n_workers=75)
+    crawler = KhabarFooriCrawler(n_workers=50)
     news = crawler.get_latest_news(n_news=750)
     with open('./news.json', 'w') as f:
         json.dump(news, f, indent=4, ensure_ascii=False)
